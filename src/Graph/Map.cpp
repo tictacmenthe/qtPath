@@ -46,9 +46,9 @@ void Map::mouseReleaseEvent(QMouseEvent *event) {
             edges.erase(it);
         }
         addNode(node, true, false);
-        if(*endNode!=Node()){
-            edges.push_back(std::make_shared<Edge>(Edge(startNode,endNode)));
-        }
+        if(*endNode!=Node())
+            addEdge(startNode,endNode);
+        findPathDijkstra();
     } else if(event->button()==Qt::MouseButton::RightButton) {
         std::shared_ptr<Node> node=std::make_shared<Node>(Node(mousex,mousey));
         auto it=std::find_if(edges.begin(),edges.end(),[&](const std::shared_ptr<Edge>& e){return (e->getB()==*startNode && e->getA()==*endNode)||(e->getA()==*startNode && e->getB()==*endNode);});
@@ -56,9 +56,9 @@ void Map::mouseReleaseEvent(QMouseEvent *event) {
             edges.erase(it);
         }
         addNode(node, false, true);
-        if(*startNode!=Node()){
-            edges.push_back(std::make_shared<Edge>(Edge(startNode,endNode)));
-        }
+        if(*startNode!=Node())
+            addEdge(startNode,endNode);
+        findPathDijkstra();
     }
     update();
 }
@@ -88,10 +88,10 @@ void Map::mapMovement(){
 void Map::populate(){
     clear();
 
-    nodes.push_back(std::make_shared<Node>(Node(1,1)));
-    nodes.push_back(std::make_shared<Node>(Node(1,height()-1)));
-    nodes.push_back(std::make_shared<Node>(Node(width()-1,1)));
-    nodes.push_back(std::make_shared<Node>(Node(width()-1,height()-1)));
+    nodes.push_back(std::shared_ptr<Node>(new Node(1,1)));
+    nodes.push_back(std::shared_ptr<Node>(new Node(1,height()-1)));
+    nodes.push_back(std::shared_ptr<Node>(new Node(width()-1,1)));
+    nodes.push_back(std::shared_ptr<Node>(new Node(width()-1,height()-1)));
 
     static int timerCount;
     QElapsedTimer timer;
@@ -137,7 +137,7 @@ void Map::populateNodes() {
     for(const Circle& c:obstacles){
         int nbNodes=sqrt(c.getRadius());
         for(int i=0;i<nbNodes;i++){
-            std::shared_ptr<Node> position=std::make_shared<Node>(c.getCenter()+Vec((float)(i*2*3.14/nbNodes), (float)(c.getRadius()*1.1+5)));
+            std::shared_ptr<Node> position=std::make_shared<Node>(c.getCenter()+Vec((float)(i*2*3.14/nbNodes), (float)(c.getRadius()*1.05+10)));
             addNode(position);
         }
     }
@@ -165,7 +165,7 @@ void Map::addNode(std::shared_ptr<Node>& position, bool isStart, bool isEnd){
         }
     }
     for(const auto& n:nodes){
-        Circle minDistCircle(*n,30);
+        Circle minDistCircle(*n,5);
         if(minDistCircle.contains(*position)){
             add=false;
             break;
@@ -345,14 +345,11 @@ void Map::paintEvent(QPaintEvent *event) {
     //painter.drawPixmap(0,0,width(), height(), background);
 
     //Lines on the table
-    painter.setBrush(Qt::darkGray);
+    painter.setBrush(Qt::black);
     //painter.drawEllipse(circleX,circleY,100,100);
     painter.setPen(Qt::NoPen);
     painter.setOpacity(0.4);
-    static std::default_random_engine generator;
-    std::uniform_real_distribution<float> distribOpacity(0.1,0.6);
     for(Circle& c:obstacles){
-        painter.setPen(distribOpacity(generator));
         c.draw(painter);
     }
     painter.setOpacity(1);
@@ -405,13 +402,13 @@ void Map::checkNeighbours(std::shared_ptr<Node> &currentNode) {
     for(auto& e:currentNode->getEdges()){
         int d=currentNode->getDistance()+e->getLength();
         if(e->getA()==*currentNode){
-            if(d<e->getB().getDistance()){
+            if(!e->getB().isVisited() && d<e->getB().getDistance()){
                 e->getB().setDistance(d);
                 e->getB().setPredecessor(currentNode);
             }
         }
         else{
-            if(d<e->getA().getDistance()){
+            if(!e->getB().isVisited() && d<e->getA().getDistance()){
                 e->getA().setDistance(d);
                 e->getA().setPredecessor(currentNode);
             }
@@ -421,13 +418,7 @@ void Map::checkNeighbours(std::shared_ptr<Node> &currentNode) {
 
 std::shared_ptr<Node> Map::minDistNode(std::vector<std::shared_ptr<Node>> &tree){
     if(tree.size()>1) {
-        std::shared_ptr<Node> minDistNode(tree[0]);
-        for (auto itn = tree.begin() + 1; itn != tree.end(); itn++) {
-            if (minDistNode->getDistance()>(*itn)->getDistance()){
-                minDistNode=*itn;
-            }
-        }
-        return minDistNode;
+        return *std::min_element(tree.begin(),tree.end(),[](const std::shared_ptr<Node>& a,const std::shared_ptr<Node>& b){return a->getDistance()<b->getDistance();});
     }
     else{
         return tree[0];
@@ -438,22 +429,25 @@ void Map::findPathDijkstra(){
 
     pathEdges.clear();
     pathNodes.clear();
-    std::shared_ptr<Node> currentNode;
+
+    std::vector<std::shared_ptr<Node>> unvisited(nodes);
+    unvisited.push_back(endNode);
+    unvisited.push_back(startNode);
+
+    QElapsedTimer timer;
+    timer.start();
+
+    for(auto& n:unvisited){
+        n->setDistance(100000000);
+        n->setNotVisited();
+    }
+
     startNode->setDistance(0);
 
-    for(auto& n:nodes){
-        n->setDistance(3000);
-    }
-    std::vector<std::shared_ptr<Node>> unvisited(nodes);
-    unvisited.push_back(startNode);
-    unvisited.push_back(endNode);
-    currentNode=minDistNode(unvisited);
-
-    currentNode->setPredecessor(startNode);
-
     int i=0;
-    while(unvisited.size()>0){
-        i++;
+    int j=0;
+    while(!unvisited.empty()){
+        std::shared_ptr<Node> currentNode=minDistNode(unvisited);
         qDebug()<<*currentNode;
         checkNeighbours(currentNode);
         currentNode->setVisited();
@@ -464,20 +458,25 @@ void Map::findPathDijkstra(){
         if(itn!=unvisited.end()){
             unvisited.erase(itn);
         }
-        currentNode=minDistNode(unvisited);
+    }
+    qint64 end=timer.nsecsElapsed();
+    qDebug()<<"Took "<<end/1000<<" µs";
+    if(endNode->getDistance()==100000000){
+        qDebug()<<"No Path found";
+        return;
     }
 
-
-    qDebug()<<"Path length:"<<endNode->getDistance();
     auto deb=qDebug();
     deb<<"Path: ";
+    std::shared_ptr<Node> currentNode=endNode;
     while(*currentNode!=*startNode){
         deb<<*currentNode;
         pathNodes.push_back(currentNode);
-        currentNode=currentNode->getPredecessor();
-        qDebug()<<*currentNode;
+        currentNode = currentNode->getPredecessor();
     }
     pathNodes.push_back(currentNode);
+    qDebug()<<"Path length:"<<endNode->getDistance()<<" with "<<pathNodes.size()-2<<" nodes";
+
     deb<<*startNode;
     for(int i=0;i<pathNodes.size()-1;i++){
         pathEdges.push_back(std::make_shared<Edge>(Edge(pathNodes.at(i),pathNodes.at(i+1))));

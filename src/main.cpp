@@ -12,6 +12,6 @@ int main(int argc, char *argv[]) {
     window.setMinimumSize(640,480);
     window.showMaximized();
     window.show();
-
-    return app.exec();
+    int error=app.exec();
+    return error;
 }

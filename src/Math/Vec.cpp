@@ -4,7 +4,7 @@
 
 #include "Vec.h"
 #include <math.h>
-#include <QDebug>
+
 
 Vec::Vec(int x, int y) : QPoint(x, y) {length=sqrt(x*x+y*y);}
 Vec::Vec(const QPoint &point) : QPoint(point) {length=sqrt(point.x()*point.x()+point.y()*point.y());}

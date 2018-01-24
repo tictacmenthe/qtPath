@@ -10,7 +10,7 @@
 #include <QtGui/QPainter>
 #include "Vec.h"
 #include "../Graph/Movable.h"
-#include <QDebug>
+
 class Circle : public Movable{
 public:
     Circle(Vec, int);

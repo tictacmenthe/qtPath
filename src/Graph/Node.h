@@ -42,7 +42,7 @@ public:
 private:
 
     std::vector<std::shared_ptr<Edge>> edges;
-    std::shared_ptr<Node> predecessor;
+    std::shared_ptr<Node> predecessor=std::shared_ptr<Node>();
     int distance=3000;
     bool visited=false;
     static constexpr int maxSpeed=2;
