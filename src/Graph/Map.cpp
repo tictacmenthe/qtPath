@@ -165,7 +165,7 @@ void Map::addNode(std::shared_ptr<Node>& position, bool isStart, bool isEnd){
         }
     }
     for(const auto& n:nodes){
-        Circle minDistCircle(*n,5);
+        Circle minDistCircle(*n,0);
         if(minDistCircle.contains(*position)){
             add=false;
             break;
@@ -418,13 +418,31 @@ void Map::checkNeighbours(std::shared_ptr<Node> &currentNode) {
 
 std::shared_ptr<Node> Map::minDistNode(std::vector<std::shared_ptr<Node>> &tree){
     if(tree.size()>1) {
-        return *std::min_element(tree.begin(),tree.end(),[](const std::shared_ptr<Node>& a,const std::shared_ptr<Node>& b){return a->getDistance()<b->getDistance();});
+        std::vector<std::shared_ptr<Node>>::iterator node=std::min_element(tree.begin(),tree.end(),
+                                                                           [](const std::shared_ptr<Node>& a,const std::shared_ptr<Node>& b)
+                                                                           {
+                                                                               return a->getDistance()<b->getDistance();
+                                                                           }
+                                                                           );
+        while((*node)->isVisited()){
+            if(node!=tree.end()){
+                tree.erase(node);
+            }
+            node=std::min_element(tree.begin(),tree.end(),
+                                  [](const std::shared_ptr<Node>& a,const std::shared_ptr<Node>& b)
+                                  {
+                                      return a->getDistance()<b->getDistance();
+                                  }
+            );
+        }
+        return *node;
     }
     else{
         return tree[0];
     }
 }
 void Map::findPathDijkstra(){
+    qDebug()<<"===================================================================";
     qDebug()<<"Searching path from"<<*startNode<<" to "<<*endNode<<" with Dijkstra";
 
     pathEdges.clear();
@@ -444,21 +462,15 @@ void Map::findPathDijkstra(){
 
     startNode->setDistance(0);
 
-    int i=0;
-    int j=0;
     while(!unvisited.empty()){
         std::shared_ptr<Node> currentNode=minDistNode(unvisited);
-        qDebug()<<*currentNode;
         checkNeighbours(currentNode);
         currentNode->setVisited();
         if(*currentNode==*endNode){
             break;
         }
-        auto itn=std::find(unvisited.begin(),unvisited.end(),currentNode);
-        if(itn!=unvisited.end()){
-            unvisited.erase(itn);
-        }
     }
+
     qint64 end=timer.nsecsElapsed();
     qDebug()<<"Took "<<end/1000<<" µs";
     if(endNode->getDistance()==100000000){
@@ -481,5 +493,6 @@ void Map::findPathDijkstra(){
     for(int i=0;i<pathNodes.size()-1;i++){
         pathEdges.push_back(std::make_shared<Edge>(Edge(pathNodes.at(i),pathNodes.at(i+1))));
     }
+
     update();
 }

@@ -5,7 +5,7 @@
 #include <iostream>
 #include "MainWindow.h"
 
-MainWindow::MainWindow(QWidget *parent) : menu(new Menu(this)), map(new Map(this,20)) {
+MainWindow::MainWindow(QWidget *parent) : menu(new Menu(this)), map(new Map(this,25)) {
     connect(menu->btnReset, &QPushButton::clicked,map, &Map::reset);
     connect(menu->btnStart, &QPushButton::clicked,map, &Map::start);
     connect(menu->btnMove, &QPushButton::clicked,this, &MainWindow::mapMovement);
