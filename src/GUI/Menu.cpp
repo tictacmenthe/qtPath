@@ -8,11 +8,11 @@ Menu::Menu(QWidget *parent):QWidget(parent){
     btnStart = new QPushButton("Genérer", this);
     btnReset = new QPushButton("Effacer", this);
     btnMove = new QPushButton("Lancer", this);
-    btnPath = new QPushButton("Chemin",this);
+    btnQuit = new QPushButton("Quitter",this);
     QGridLayout *grid = new QGridLayout(this);
     grid->addWidget(btnReset, 0,0);
     grid->addWidget(btnStart, 1,0);
-    grid->addWidget(btnPath,0,1);
+    grid->addWidget(btnQuit,0,1);
     grid->addWidget(btnMove, 1,1);
 
     setLayout(grid);

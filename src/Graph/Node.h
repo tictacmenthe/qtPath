@@ -30,8 +30,8 @@ public:
     void setDistance(int);
 
     bool isVisited(){return visited;}
-    bool setVisited(){visited=true;}
-    bool setNotVisited(){visited=false;}
+    void setVisited(){visited=true;}
+    void setNotVisited(){visited=false;}
 
     void setPredecessor(std::shared_ptr<Node>& e);
     std::shared_ptr<Node>& getPredecessor();

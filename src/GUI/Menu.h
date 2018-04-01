@@ -4,14 +4,13 @@
 #ifndef QTSTAR_MENU_H
 #define QTSTAR_MENU_H
 
-#include <QWidget>
-#include <QLabel>
-#include <QGridLayout>
-#include <QPushButton>
+#include <QtWidgets/QWidget>
+#include <QtWidgets/QLabel>
+#include <QtWidgets/QGridLayout>
+#include <QtWidgets/QPushButton>
 #include <QPainter>
 
 class Menu : public QWidget {
-    Q_OBJECT
 public:
     Menu(QWidget* parent=0);
     void paintEvent(QPaintEvent *event) override;
@@ -19,7 +18,7 @@ public:
     QPushButton* btnReset;
     QPushButton* btnMove;
     QPushButton* btnStart;
-    QPushButton* btnPath;
+    QPushButton* btnQuit;
 };
 
 #endif //QTSTAR_MENU_H

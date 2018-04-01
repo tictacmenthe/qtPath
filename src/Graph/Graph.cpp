@@ -1,118 +1,44 @@
 //
-// Created by tic-tac on 11/01/18.
+// Created by tic-tac on 4/1/18.
 //
 
-#include <iostream>
-#include "Map.h"
-#include "../Math/Math.h"
-#include <QDebug>
-#include <random>
-#include <QtCore/QTime>
 #include <QtCore/QElapsedTimer>
-#include <deque>
+#include "Graph.h"
 
-#define TIMER_FREQ   24
-#define TIMER_PERIOD (int)1000/TIMER_FREQ
+Graph::Graph(int p_nbCircles, int p_width, int p_height, QRect parentRect):parent(parentRect) {
 
-#define CONCAT_(x,y) x##y
-#define CONCAT(x,y) CONCAT_(x,y)
-
-#define CHECKTIME(x)  \
-    QElapsedTimer CONCAT(sb_, __LINE__); \
-    CONCAT(sb_, __LINE__).start(); \
-    x \
-    qDebug() << __FUNCTION__ << ":" << __LINE__ << " Elapsed time: " <<  CONCAT(sb_, __LINE__).nsecsElapsed() << " ns.";
-
-Map::Map(QWidget *parent, int p_nbCircles) {
-    background.load("../map.png");
     nbCircles=p_nbCircles;
-
-    setMouseTracking(true);
-
-    installEventFilter(this);
-
+    width=p_width;
+    height=p_height;
     startNode=std::make_shared<Node>();
     endNode=std::make_shared<Node>();
-
-    connect(&timer, &QTimer::timeout,this,&Map::updatePos);
-    started=false;
 }
 
-void Map::mouseReleaseEvent(QMouseEvent *event) {
-    if (event->button()==Qt::MouseButton::LeftButton) {
-        std::shared_ptr<Node> node=std::make_shared<Node>(Node(mousex,mousey));
-        auto it=std::find_if(edges.begin(),edges.end(),[&](const std::shared_ptr<Edge>& e){return (e->getB()==*startNode && e->getA()==*endNode)||(e->getA()==*startNode && e->getB()==*endNode);});
-        if(it!=edges.end()){
-            edges.erase(it);
-        }
-        addNode(node, true, false);
-        if(*endNode!=Node())
-            addEdge(startNode,endNode);
-        findPathDijkstra();
-    } else if(event->button()==Qt::MouseButton::RightButton) {
-        std::shared_ptr<Node> node=std::make_shared<Node>(Node(mousex,mousey));
-        auto it=std::find_if(edges.begin(),edges.end(),[&](const std::shared_ptr<Edge>& e){return (e->getB()==*startNode && e->getA()==*endNode)||(e->getA()==*startNode && e->getB()==*endNode);});
-        if(it!=edges.end()){
-            edges.erase(it);
-        }
-        addNode(node, false, true);
-        if(*startNode!=Node())
-            addEdge(startNode,endNode);
-        findPathDijkstra();
-    }
-    update();
-}
 
-void Map::mouseMoveEvent(QMouseEvent *event) {
-    mousex=event->x();
-    mousey=event->y();
+/****************************************************
+ *                      Generating                  *
+ ****************************************************/
 
-    update();
-}
-
-void Map::resizeEvent(QResizeEvent *event) {
-    if(started) {
-        populate();
-    }
-}
-
-void Map::mapMovement(){
-    if(timer.isActive()) {
-        timer.stop();
-    }
-    else{
-        timer.start(TIMER_PERIOD);
-    }
-}
-
-void Map::populate(){
+void Graph::populate() {
     clear();
 
     nodes.push_back(std::shared_ptr<Node>(new Node(1,1)));
-    nodes.push_back(std::shared_ptr<Node>(new Node(1,height()-1)));
-    nodes.push_back(std::shared_ptr<Node>(new Node(width()-1,1)));
-    nodes.push_back(std::shared_ptr<Node>(new Node(width()-1,height()-1)));
+    nodes.push_back(std::shared_ptr<Node>(new Node(1,height-1)));
+    nodes.push_back(std::shared_ptr<Node>(new Node(width-1,1)));
+    nodes.push_back(std::shared_ptr<Node>(new Node(width-1,height-1)));
 
-    static int timerCount;
-    QElapsedTimer timer;
-
-    timer.start();
     populateObstacles();
     populateNodes();
     populateEdges();
-    timerCount+=timer.nsecsElapsed()/1000;
-
-    timer.restart();
-    update();
 }
 
-void Map::populateObstacles(){
+void Graph::populateObstacles(){
     std::default_random_engine generator(time(nullptr));
-    std::uniform_real_distribution<float> sizeDist(10,height()/8+20);
+    std::uniform_real_distribution<float> sizeDist(10,height/8+20);
     for(int i=0;i<nbCircles;){
-        int size=Math::abs(sizeDist(generator))+10;
-        std::uniform_int_distribution<int> xDist(size,width()-size);
-        std::uniform_int_distribution<int> yDist(size,height()-size);
+        int size=abs(sizeDist(generator))+10;
+        std::uniform_int_distribution<int> xDist(size,width-size);
+        std::uniform_int_distribution<int> yDist(size,height-size);
         int cx=xDist(generator);
         int cy=yDist(generator);
         bool add=true;
@@ -133,7 +59,7 @@ void Map::populateObstacles(){
     }
 }
 
-void Map::populateNodes() {
+void Graph::populateNodes() {
     for(const Circle& c:obstacles){
         int nbNodes=sqrt(c.getRadius());
         for(int i=0;i<nbNodes;i++){
@@ -143,7 +69,7 @@ void Map::populateNodes() {
     }
 }
 
-void Map::populateEdges(){
+void Graph::populateEdges(){
     int nbNodes=nodes.size();
     for(int i=0;i<nbNodes-1;i++) {
         for (int j = i + 1; j < nbNodes; j++) {
@@ -152,12 +78,34 @@ void Map::populateEdges(){
     }
 }
 
-void Map::addCircle(const Vec &center, int radius) {
+
+void Graph::clear(){
+    obstacles.clear();
+    nodes.clear();
+    edges.clear();
+
+    startNode=std::make_shared<Node>();
+    startEdges.clear();
+
+    endNode=std::make_shared<Node>();
+    endEdges.clear();
+
+    pathNodes.clear();
+    pathEdges.clear();
+}
+
+
+/****************************************************
+ *                      Adding                      *
+ ****************************************************/
+
+void Graph::addCircle(const Vec &center, int radius) {
     obstacles.emplace_back(center, radius);
 }
 
-void Map::addNode(std::shared_ptr<Node>& position, bool isStart, bool isEnd){
-    bool add=rect().contains(*position);
+
+void Graph::addNode(std::shared_ptr<Node>& position, bool isStart, bool isEnd){
+    bool add=parent.contains(*position);
     for(const Circle& c:obstacles){
         if(c.contains(*position)){
             add=false;
@@ -194,7 +142,7 @@ void Map::addNode(std::shared_ptr<Node>& position, bool isStart, bool isEnd){
     }
 }
 
-void Map::addEdge(std::shared_ptr<Node> &a,std::shared_ptr<Node> &b, bool isStart, bool isEnd) {
+void Graph::addEdge(std::shared_ptr<Node> &a,std::shared_ptr<Node> &b, bool isStart, bool isEnd) {
     int add=NOT_IN_OBSTACLE;
     Edge e(a,b);
     for(const Circle& c:obstacles){
@@ -226,85 +174,12 @@ void Map::addEdge(std::shared_ptr<Node> &a,std::shared_ptr<Node> &b, bool isStar
     }
 }
 
-void Map::clear(){
-    obstacles.clear();
-    nodes.clear();
-    edges.clear();
-    startNode=std::make_shared<Node>();
-    startEdges.clear();
-    endNode=std::make_shared<Node>();
-    endEdges.clear();
-    pathNodes.clear();
-    pathEdges.clear();
-    update();
-}
 
-void Map::updatePos(){
-    std::default_random_engine generator(time(nullptr));
-    std::normal_distribution<float> distribution(0,0.2);
+/****************************************************
+ *                      Removing                    *
+ ****************************************************/
 
-    for(Circle& c: obstacles){
-        float addvx=distribution(generator);
-        float addvy=distribution(generator);
-        c.addSpeeds(addvx,addvy);
-        c.setCenter(c.getCenter()+Vec(c.getSpeedX(),c.getSpeedY()));
-        if(!rect().contains(c.getCenter())){
-            obstacles.erase(std::find(obstacles.begin(),obstacles.end(),c));
-        }
-    }
-
-    for(auto itn=nodes.begin(); itn!=nodes.end();){
-        auto& n=**itn;
-        bool toErase=false;
-        float addvx=distribution(generator);
-        float addvy=distribution(generator);
-        n.addSpeeds(addvx,addvy);
-
-        n.setX(n.x()+n.getSpeedX());
-        n.setY(n.y()+n.getSpeedY());
-
-        for(auto& c:obstacles){
-            if(c.contains(n)){
-                toErase=true;
-                break;
-            }
-        }
-        if(!rect().contains(n) || toErase){
-            removeEdgesOfNode(n);
-            itn=nodes.erase(itn);
-        }
-        else{
-            itn++;
-        }
-    }
-
-    //Deletion of edges that intersect with circles
-    for(auto ite=edges.begin();ite!=edges.end();){
-        auto& e=**ite;
-        int state=NOT_IN_OBSTACLE;
-        for(const auto& c:obstacles){
-            state=checkObstacleInEdge(c,e,true);
-            if(state==IGNORE){
-                state=NOT_IN_OBSTACLE;
-                continue;
-            }
-            else if(state==IN_OBSTACLE){
-                break;
-            }
-        }
-        if(state==IN_OBSTACLE){
-            e.getA().removeEdge(*ite);
-            e.getB().removeEdge(*ite);
-            ite=edges.erase(ite);
-        }
-        else{
-            ite++;
-        }
-    }
-    update();
-}
-
-int Map::checkObstacleInEdge(const Circle &c, const Edge &e, bool verifyDistance) {
+int Graph::checkObstacleInEdge(const Circle &c, const Edge &e, bool verifyDistance) {
     if(c.getCenter().dist(e.getCenter())-c.getRadius() > e.getLength()/2){
         return IGNORE;
     }
@@ -317,7 +192,7 @@ int Map::checkObstacleInEdge(const Circle &c, const Edge &e, bool verifyDistance
     return NOT_IN_OBSTACLE;
 }
 
-void Map::removeEdgesOfNode(Node &n){
+void Graph::removeEdgesOfNode(Node &n){
     for(auto ite=n.getEdges().begin();ite!=n.getEdges().end();ite++){
         auto& it=*ite;
         auto toRemove=std::find(edges.begin(),edges.end(),it);
@@ -335,15 +210,10 @@ void Map::removeEdgesOfNode(Node &n){
     }
 }
 
-void Map::paintEvent(QPaintEvent *event) {
-    QPainter painter(this);
-    //painter.setRenderHint(QPainter::Antialiasing);
-    painter.setPen(QPen(Qt::gray, 2, Qt::SolidLine, Qt::RoundCap));
-    //Background Color
-    //painter.fillRect(rect(),Qt::darkGray);
-    painter.drawRect(rect());
-    //painter.drawPixmap(0,0,width(), height(), background);
-
+/****************************************************
+ *                      GUI                         *
+ ****************************************************/
+void Graph::paint(QPainter &painter) {
     //Lines on the table
     painter.setBrush(Qt::black);
     //painter.drawEllipse(circleX,circleY,100,100);
@@ -364,7 +234,7 @@ void Map::paintEvent(QPaintEvent *event) {
 
     endNode->draw(painter);
 
-    painter.setPen(QPen(Qt::yellow,0.08));
+    painter.setPen(QPen(Qt::yellow,0.05));
     for(auto& e:edges){
         e->draw(painter);
     }
@@ -385,20 +255,18 @@ void Map::paintEvent(QPaintEvent *event) {
     }
     painter.setFont(QFont("Arial",10));
     painter.setPen(QPen(Qt::red,1));
-    painter.drawText(20,20,QString("x: ").append(QString::number(mousex)));
-    painter.drawText(20,40,QString("y: ").append(QString::number(mousey)));
-    painter.drawText(width()-100,height()-50,QString("C: ").append(QString::number(obstacles.size())));
-    painter.drawText(width()-100,height()-30,QString("N: ").append(QString::number(nodes.size()+(*startNode!=Node())+(*endNode!=(Node())))));
-    painter.drawText(width()-100,height()-10,QString("E: ").append(QString::number((edges.size()+startEdges.size()+endEdges.size()))));
+
+    painter.drawText(width-100,height-50,QString("C: ").append(QString::number(obstacles.size())));
+    painter.drawText(width-100,height-30,QString("N: ").append(QString::number(nodes.size()+(*startNode!=Node())+(*endNode!=(Node())))));
+    painter.drawText(width-100,height-10,QString("E: ").append(QString::number((edges.size()+startEdges.size()+endEdges.size()))));
 }
 
 
-/*********************************************************/
-/*                      PATHFINDING                      */
-/*********************************************************/
+/****************************************************
+ *                      PathFinding                 *
+ ****************************************************/
 
-
-void Map::checkNeighbours(std::shared_ptr<Node> &currentNode) {
+void Graph::checkNeighbours(std::shared_ptr<Node> &currentNode) {
     for(auto& e:currentNode->getEdges()){
         int d=currentNode->getDistance()+e->getLength();
         if(e->getA()==*currentNode){
@@ -416,14 +284,14 @@ void Map::checkNeighbours(std::shared_ptr<Node> &currentNode) {
     }
 }
 
-std::shared_ptr<Node> Map::minDistNode(std::vector<std::shared_ptr<Node>> &tree){
+std::shared_ptr<Node> Graph::minDistNode(std::vector<std::shared_ptr<Node>> &tree){
     if(tree.size()>1) {
         std::vector<std::shared_ptr<Node>>::iterator node=std::min_element(tree.begin(),tree.end(),
                                                                            [](const std::shared_ptr<Node>& a,const std::shared_ptr<Node>& b)
                                                                            {
                                                                                return a->getDistance()<b->getDistance();
                                                                            }
-                                                                           );
+        );
         while((*node)->isVisited()){
             if(node!=tree.end()){
                 tree.erase(node);
@@ -441,8 +309,8 @@ std::shared_ptr<Node> Map::minDistNode(std::vector<std::shared_ptr<Node>> &tree)
         return tree[0];
     }
 }
-void Map::findPathDijkstra(){
-    qDebug()<<"===================================================================";
+
+void Graph::findPathDijkstra(){
     qDebug()<<"Searching path from"<<*startNode<<" to "<<*endNode<<" with Dijkstra";
 
     pathEdges.clear();
@@ -494,5 +362,74 @@ void Map::findPathDijkstra(){
         pathEdges.push_back(std::make_shared<Edge>(Edge(pathNodes.at(i),pathNodes.at(i+1))));
     }
 
-    update();
 }
+
+
+/****************************************************
+ *                      Animation                   *
+ ****************************************************/
+
+void Graph::update() {
+    std::default_random_engine generator(time(nullptr));
+    std::normal_distribution<float> distribution(0,0.2);
+
+    for(Circle& c: obstacles){
+        float addvx=distribution(generator);
+        float addvy=distribution(generator);
+        c.addSpeeds(addvx,addvy);
+        c.setCenter(c.getCenter()+Vec(c.getSpeedX(),c.getSpeedY()));
+        if(!parent.contains(c.getCenter())){
+            obstacles.erase(std::find(obstacles.begin(),obstacles.end(),c));
+        }
+    }
+
+    for(auto itn=nodes.begin(); itn!=nodes.end();){
+        auto& n=**itn;
+        bool toErase=false;
+        float addvx=distribution(generator);
+        float addvy=distribution(generator);
+        n.addSpeeds(addvx,addvy);
+
+        n.setX(n.x()+n.getSpeedX());
+        n.setY(n.y()+n.getSpeedY());
+
+        for(auto& c:obstacles){
+            if(c.contains(n)){
+                toErase=true;
+                break;
+            }
+        }
+        if(!parent.contains(n) || toErase){
+            removeEdgesOfNode(n);
+            itn=nodes.erase(itn);
+        }
+        else{
+            itn++;
+        }
+    }
+
+    //Deletion of edges that intersect with circles
+    for(auto ite=edges.begin();ite!=edges.end();){
+        auto& e=**ite;
+        int state=NOT_IN_OBSTACLE;
+        for(const auto& c:obstacles){
+            state=checkObstacleInEdge(c,e,true);
+            if(state==IGNORE){
+                state=NOT_IN_OBSTACLE;
+                continue;
+            }
+            else if(state==IN_OBSTACLE){
+                break;
+            }
+        }
+        if(state==IN_OBSTACLE){
+            e.getA().removeEdge(*ite);
+            e.getB().removeEdge(*ite);
+            ite=edges.erase(ite);
+        }
+        else{
+            ite++;
+        }
+    }
+}
+

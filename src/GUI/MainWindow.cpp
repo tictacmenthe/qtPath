@@ -5,11 +5,11 @@
 #include <iostream>
 #include "MainWindow.h"
 
-MainWindow::MainWindow(QWidget *parent) : menu(new Menu(this)), map(new Map(this,25)) {
-    connect(menu->btnReset, &QPushButton::clicked,map, &Map::reset);
-    connect(menu->btnStart, &QPushButton::clicked,map, &Map::start);
-    connect(menu->btnMove, &QPushButton::clicked,this, &MainWindow::mapMovement);
-    connect(menu->btnPath, &QPushButton::clicked,map, &Map::findPathDijkstra);
+MainWindow::MainWindow(QWidget *parent) : menu(new Menu(this)), map(new MapFrame(this,25)) {
+//    connect(menu->btnReset, &QPushButton::clicked,map, &MapFrame::reset);
+//    connect(menu->btnStart, &QPushButton::clicked,map, &MapFrame::start);
+//    connect(menu->btnMove, &QPushButton::clicked,this, &MainWindow::mapMovement);
+//    connect(menu->btnQuit, &QPushButton::clicked,this, &MainWindow::close);
 
     map->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
@@ -26,6 +26,7 @@ void MainWindow::mapMovement(){
     map->mapMovement();
     menu->update();
 }
+
 bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
     if(event->type()==QEvent::KeyPress){
         QKeyEvent* keyEvent= static_cast<QKeyEvent*>(event);
@@ -33,7 +34,7 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
             std::cout<<"Escape pressed, exiting"<<std::endl;
             this->close();
         }
-        else if(keyEvent->key()==Qt::Key_A){
+        else if(keyEvent->key()==Qt::Key_Space){
             static bool active=false;
             std::cout<<"Space pressed, generating"<<std::endl;
             if(!active){

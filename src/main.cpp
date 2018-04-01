@@ -1,8 +1,5 @@
-#include <QApplication>
-#include <iostream>
-
-#include "MainWindow.h"
-#include "Math/Math.h"
+#include <QtWidgets/QApplication>
+#include "GUI/MainWindow.h"
 
 int main(int argc, char *argv[]) {
 
