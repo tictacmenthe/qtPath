@@ -6,7 +6,6 @@
 #include "Graph.h"
 
 Graph::Graph(int p_nbCircles, int p_width, int p_height, QRect parentRect):parent(parentRect) {
-
     nbCircles=p_nbCircles;
     width=p_width;
     height=p_height;
@@ -15,13 +14,17 @@ Graph::Graph(int p_nbCircles, int p_width, int p_height, QRect parentRect):paren
 }
 
 
-/****************************************************
+/* **************************************************
  *                      Generating                  *
  ****************************************************/
 
+/**
+ *  Populates the graph with obstacles, nodes and edges
+ */
 void Graph::populate() {
     clear();
 
+    //shortcut nodes, linking all edges of the map if possible
     nodes.push_back(std::shared_ptr<Node>(new Node(1,1)));
     nodes.push_back(std::shared_ptr<Node>(new Node(1,height-1)));
     nodes.push_back(std::shared_ptr<Node>(new Node(width-1,1)));
@@ -32,6 +35,9 @@ void Graph::populate() {
     populateEdges();
 }
 
+/**
+ *  Creates and assigns obstacles (currently Circles) on the graph, making sure two circles don't contain one another
+ */
 void Graph::populateObstacles(){
     std::default_random_engine generator(time(nullptr));
     std::uniform_real_distribution<float> sizeDist(10,height/8+20);
@@ -59,6 +65,9 @@ void Graph::populateObstacles(){
     }
 }
 
+/**
+ * Creates and assigns nodes arounds obstacles(currently in a circle around them)
+ */
 void Graph::populateNodes() {
     for(const Circle& c:obstacles){
         int nbNodes=sqrt(c.getRadius());
@@ -69,6 +78,9 @@ void Graph::populateNodes() {
     }
 }
 
+/**
+ * Creates and assigns edges between nodes when possible
+ */
 void Graph::populateEdges(){
     int nbNodes=nodes.size();
     for(int i=0;i<nbNodes-1;i++) {
@@ -78,7 +90,9 @@ void Graph::populateEdges(){
     }
 }
 
-
+/**
+ * Resets every object on the graph
+ */
 void Graph::clear(){
     obstacles.clear();
     nodes.clear();
@@ -95,16 +109,27 @@ void Graph::clear(){
 }
 
 
-/****************************************************
+/* **************************************************
  *                      Adding                      *
  ****************************************************/
 
+
+/**
+ * Adds a circle to the obstacles
+ * @param center position of the circle
+ * @param radius of the circle
+ */
 void Graph::addCircle(const Vec &center, int radius) {
     obstacles.emplace_back(center, radius);
 }
 
 
-void Graph::addNode(std::shared_ptr<Node>& position, bool isStart, bool isEnd){
+/**
+ * Checks if a position is inside any circle or too close to existing nodes
+ * @param position
+ * @return
+ */
+bool Graph::checkNodeCreation(std::shared_ptr<Node> &position){
     bool add=parent.contains(*position);
     for(const Circle& c:obstacles){
         if(c.contains(*position)){
@@ -112,6 +137,7 @@ void Graph::addNode(std::shared_ptr<Node>& position, bool isStart, bool isEnd){
             break;
         }
     }
+
     for(const auto& n:nodes){
         Circle minDistCircle(*n,0);
         if(minDistCircle.contains(*position)){
@@ -119,31 +145,62 @@ void Graph::addNode(std::shared_ptr<Node>& position, bool isStart, bool isEnd){
             break;
         }
     }
-    if(add){
-        if(isStart) {
+    return add;
+}
+
+/**
+ *  Adds a node at a position if it is possible
+ * @param position
+ */
+void Graph::addNode(std::shared_ptr<Node>& position){
+    if(checkNodeCreation(position)){
+        nodes.push_back(position);
+    }
+}
+
+/**
+ * Adds a start or end node for the pathfinding, ends with  path finding if both nodes exist
+ * @param position position of node
+ * @param type of the node
+ */
+void Graph::addPathNode(std::shared_ptr<Node> &position, NodeType type) {
+    if(checkNodeCreation(position)) {
+        if (type == START_NODE) {
             removeEdgesOfNode(*startNode);
-            startNode=position;
+            startNode = position;
             startEdges.clear();
-            for(auto& n:nodes){
-                addEdge(startNode, n, true,false);
+            for (auto &n:nodes) {
+                addEdge(startNode, n, START_NODE);
             }
-        }
-        else if(isEnd){
+            if (*endNode != Node()) {
+                addEdge(startNode, endNode);
+                findPathDijkstra();
+
+            }
+        } else if (type == END_NODE) {
             removeEdgesOfNode(*endNode);
             endEdges.clear();
-            endNode=position;
-            for(auto& n:nodes){
-                addEdge(endNode, n, false,true);
+            endNode = position;
+            for (auto &n:nodes) {
+                addEdge(endNode, n, END_NODE);
             }
-        }
-        else{
-            nodes.push_back(position);
+            if (*startNode != Node()) {
+                addEdge(startNode, endNode);
+                findPathDijkstra();
+            }
         }
     }
 }
 
-void Graph::addEdge(std::shared_ptr<Node> &a,std::shared_ptr<Node> &b, bool isStart, bool isEnd) {
-    int add=NOT_IN_OBSTACLE;
+/**
+ * Creates an edge between two nodes
+ * @param a one node
+ * @param b another node
+ * @param type the type of edge: Default->links two default nodes or both start and end nodes,\
+ * start/end_node -> links a default node to a start/end node
+ */
+void Graph::addEdge(std::shared_ptr<Node> &a, std::shared_ptr<Node> &b, NodeType type) {
+    ObstacleState add=NOT_IN_OBSTACLE;
     Edge e(a,b);
     for(const Circle& c:obstacles){
         add=checkObstacleInEdge(c,e);
@@ -156,18 +213,18 @@ void Graph::addEdge(std::shared_ptr<Node> &a,std::shared_ptr<Node> &b, bool isSt
         }
     }
     if(add==NOT_IN_OBSTACLE){
-        if(isStart){
-            startEdges.emplace_back(std::make_shared<Edge>(a,b));
+        if(type==START_NODE){
+            startEdges.emplace_back(std::make_shared<Edge>(e));
             a->addEdge(startEdges.back());
             b->addEdge(startEdges.back());
         }
-        else if(isEnd){
-            endEdges.emplace_back(std::make_shared<Edge>(a,b));
+        else if(type==END_NODE){
+            endEdges.emplace_back(std::make_shared<Edge>(e));
             a->addEdge(endEdges.back());
             b->addEdge(endEdges.back());
         }
         else{
-            edges.emplace_back(std::make_shared<Edge>(a,b));
+            edges.emplace_back(std::make_shared<Edge>(e));
             a->addEdge(edges.back());
             b->addEdge(edges.back());
         }
@@ -175,11 +232,18 @@ void Graph::addEdge(std::shared_ptr<Node> &a,std::shared_ptr<Node> &b, bool isSt
 }
 
 
-/****************************************************
+/* **************************************************
  *                      Removing                    *
  ****************************************************/
 
-int Graph::checkObstacleInEdge(const Circle &c, const Edge &e, bool verifyDistance) {
+/**
+ * Checks whether an obstacle and edge intersect
+ * @param c obstacle to check
+ * @param e edge to check
+ * @return boolean ObstacleState(edge is in obstacle, not obstacle, or obstacle is ignored)
+ */
+
+Graph::ObstacleState Graph::checkObstacleInEdge(const Circle &c, const Edge &e) {
     if(c.getCenter().dist(e.getCenter())-c.getRadius() > e.getLength()/2){
         return IGNORE;
     }
@@ -192,6 +256,10 @@ int Graph::checkObstacleInEdge(const Circle &c, const Edge &e, bool verifyDistan
     return NOT_IN_OBSTACLE;
 }
 
+/**
+ * Removes all edges of a node from all edge lists
+ * @param n that is intended to be deleted
+ */
 void Graph::removeEdgesOfNode(Node &n){
     for(auto ite=n.getEdges().begin();ite!=n.getEdges().end();ite++){
         auto& it=*ite;
@@ -210,9 +278,26 @@ void Graph::removeEdgesOfNode(Node &n){
     }
 }
 
-/****************************************************
+/**
+ * Removes the edge linking start and end nodes together
+ */
+void Graph::removeEdgeStartEndNodes() {
+    auto it=std::find_if(edges.begin(),edges.end(),[&](const std::shared_ptr<Edge>& e)
+    {
+        return (e->getB()==*startNode && e->getA()==*endNode)||(e->getA()==*startNode && e->getB()==*endNode);
+    });
+    if(it!=edges.end())
+        edges.erase(it);
+}
+
+/* **************************************************
  *                      GUI                         *
  ****************************************************/
+
+/**
+ * Paints the graph elements using
+ * @param painter the painter provided by MapFrame::paintEvent
+ */
 void Graph::paint(QPainter &painter) {
     //Lines on the table
     painter.setBrush(Qt::black);
@@ -234,7 +319,7 @@ void Graph::paint(QPainter &painter) {
 
     endNode->draw(painter);
 
-    painter.setPen(QPen(Qt::yellow,0.05));
+    painter.setPen(QPen(Qt::yellow,0.1));
     for(auto& e:edges){
         e->draw(painter);
     }
@@ -242,7 +327,7 @@ void Graph::paint(QPainter &painter) {
     for(auto& e:startEdges){
         e->draw(painter);
     }
-    painter.setPen(QPen(Qt::red,0.2));
+    painter.setPen(QPen(Qt::red,0.3));
     for(auto& e:endEdges){
         e->draw(painter);
     }
@@ -261,11 +346,60 @@ void Graph::paint(QPainter &painter) {
     painter.drawText(width-100,height-10,QString("E: ").append(QString::number((edges.size()+startEdges.size()+endEdges.size()))));
 }
 
+void Graph::resize(float hratio, float wratio, const QRect newRect){
+    parent=newRect;
+    width=parent.width();
+    height=parent.height();
 
-/****************************************************
+    if(obstacles.size()>0) {
+        for (auto &o : obstacles) {
+            Vec newCenter(int(o.getCenter().x() * wratio), int(o.getCenter().y() * hratio));
+            o.setCenter(newCenter);
+
+        }
+
+        removeEdgeStartEndNodes();
+
+        nodes.clear();
+        pathNodes.clear();
+        edges.clear();
+        pathEdges.clear();
+        startEdges.clear();
+        endEdges.clear();
+
+        nodes.push_back(std::shared_ptr<Node>(new Node(1, 1)));
+        nodes.push_back(std::shared_ptr<Node>(new Node(1, height - 1)));
+        nodes.push_back(std::shared_ptr<Node>(new Node(width - 1, 1)));
+        nodes.push_back(std::shared_ptr<Node>(new Node(width - 1, height - 1)));
+
+        populateNodes();
+        populateEdges();
+
+        if (*startNode != Node()) {
+            startNode->setX(startNode->x() * wratio);
+            startNode->setY(startNode->y() * hratio);
+            for (auto &n : nodes) {
+                addEdge(startNode, n, START_NODE);
+            }
+        }
+        if (*endNode != Node()) {
+            endNode->setX(endNode->x() * wratio);
+            endNode->setY(endNode->y() * hratio);
+            for (auto &n : nodes) {
+                addEdge(startNode, n, END_NODE);
+            }
+        }
+    }
+}
+
+/* **************************************************
  *                      PathFinding                 *
  ****************************************************/
 
+/**
+ * Checks a node's unvisited neighbours' distances in path
+ * @param currentNode the node whose neighbours are going to be checked
+ */
 void Graph::checkNeighbours(std::shared_ptr<Node> &currentNode) {
     for(auto& e:currentNode->getEdges()){
         int d=currentNode->getDistance()+e->getLength();
@@ -284,14 +418,19 @@ void Graph::checkNeighbours(std::shared_ptr<Node> &currentNode) {
     }
 }
 
+/**
+ * Looks for the minimal distance node in a graph
+ * @param tree the Node tree to be used
+ * @return pointer to the minimal distance node
+ */
 std::shared_ptr<Node> Graph::minDistNode(std::vector<std::shared_ptr<Node>> &tree){
     if(tree.size()>1) {
         std::vector<std::shared_ptr<Node>>::iterator node=std::min_element(tree.begin(),tree.end(),
-                                                                           [](const std::shared_ptr<Node>& a,const std::shared_ptr<Node>& b)
-                                                                           {
-                                                                               return a->getDistance()<b->getDistance();
-                                                                           }
-        );
+           [](const std::shared_ptr<Node>& a,const std::shared_ptr<Node>& b)
+           {
+               return a->getDistance()<b->getDistance();
+           });
+
         while((*node)->isVisited()){
             if(node!=tree.end()){
                 tree.erase(node);
@@ -310,6 +449,9 @@ std::shared_ptr<Node> Graph::minDistNode(std::vector<std::shared_ptr<Node>> &tre
     }
 }
 
+/**
+ * Tries to find a path between two nodes set by left and right click, according to the Dijkstra algorithm
+ */
 void Graph::findPathDijkstra(){
     qDebug()<<"Searching path from"<<*startNode<<" to "<<*endNode<<" with Dijkstra";
 
@@ -324,7 +466,7 @@ void Graph::findPathDijkstra(){
     timer.start();
 
     for(auto& n:unvisited){
-        n->setDistance(100000000);
+        n->setDistance(DijkstraMaxDistance);
         n->setNotVisited();
     }
 
@@ -341,7 +483,7 @@ void Graph::findPathDijkstra(){
 
     qint64 end=timer.nsecsElapsed();
     qDebug()<<"Took "<<end/1000<<" µs";
-    if(endNode->getDistance()==100000000){
+    if(endNode->getDistance()==DijkstraMaxDistance){
         qDebug()<<"No Path found";
         return;
     }
@@ -383,53 +525,60 @@ void Graph::update() {
         }
     }
 
-    for(auto itn=nodes.begin(); itn!=nodes.end();){
-        auto& n=**itn;
-        bool toErase=false;
-        float addvx=distribution(generator);
-        float addvy=distribution(generator);
-        n.addSpeeds(addvx,addvy);
+//    for(auto itn=nodes.begin(); itn!=nodes.end();){
+//        auto& n=**itn;
+//        bool toErase=false;
+//        float addvx=distribution(generator);
+//        float addvy=distribution(generator);
+//        n.addSpeeds(addvx,addvy);
+//
+//        n.setX(n.x()+n.getSpeedX());
+//        n.setY(n.y()+n.getSpeedY());
+//
+//        for(auto& c:obstacles){
+//            if(c.contains(n)){
+//                toErase=true;
+//                break;
+//            }
+//        }
+//        if(!parent.contains(n) || toErase){
+//            removeEdgesOfNode(n);
+//            itn=nodes.erase(itn);
+//        }
+//        else{
+//            itn++;
+//        }
+//    }
+//
+//    //Deletion of edges that intersect with circles
+//    for(auto ite=edges.begin();ite!=edges.end();){
+//        auto& e=**ite;
+//        ObstacleState state=NOT_IN_OBSTACLE;
+//        for(const auto& c:obstacles){
+//            state=checkObstacleInEdge(c,e);
+//            if(state==IGNORE){
+//                state=NOT_IN_OBSTACLE;
+//                continue;
+//            }
+//            else if(state==IN_OBSTACLE){
+//                break;
+//            }
+//        }
+//        if(state==IN_OBSTACLE){
+//            e.getA().removeEdge(*ite);
+//            e.getB().removeEdge(*ite);
+//            ite=edges.erase(ite);
+//        }
+//        else{
+//            ite++;
+//        }
+//    }
 
-        n.setX(n.x()+n.getSpeedX());
-        n.setY(n.y()+n.getSpeedY());
+    nodes.clear();
+    edges.clear();
 
-        for(auto& c:obstacles){
-            if(c.contains(n)){
-                toErase=true;
-                break;
-            }
-        }
-        if(!parent.contains(n) || toErase){
-            removeEdgesOfNode(n);
-            itn=nodes.erase(itn);
-        }
-        else{
-            itn++;
-        }
-    }
 
-    //Deletion of edges that intersect with circles
-    for(auto ite=edges.begin();ite!=edges.end();){
-        auto& e=**ite;
-        int state=NOT_IN_OBSTACLE;
-        for(const auto& c:obstacles){
-            state=checkObstacleInEdge(c,e,true);
-            if(state==IGNORE){
-                state=NOT_IN_OBSTACLE;
-                continue;
-            }
-            else if(state==IN_OBSTACLE){
-                break;
-            }
-        }
-        if(state==IN_OBSTACLE){
-            e.getA().removeEdge(*ite);
-            e.getB().removeEdge(*ite);
-            ite=edges.erase(ite);
-        }
-        else{
-            ite++;
-        }
-    }
+    populateNodes();
+    populateEdges();
 }
 

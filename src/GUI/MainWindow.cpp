@@ -6,15 +6,16 @@
 #include "MainWindow.h"
 
 MainWindow::MainWindow(QWidget *parent) : menu(new Menu(this)), map(new MapFrame(this,25)) {
-//    connect(menu->btnReset, &QPushButton::clicked,map, &MapFrame::reset);
-//    connect(menu->btnStart, &QPushButton::clicked,map, &MapFrame::start);
-//    connect(menu->btnMove, &QPushButton::clicked,this, &MainWindow::mapMovement);
-//    connect(menu->btnQuit, &QPushButton::clicked,this, &MainWindow::close);
+    connect(menu->btnReset, &QPushButton::clicked,map, &MapFrame::reset);
+    connect(menu->btnStart, &QPushButton::clicked,map, &MapFrame::start);
+    connect(menu->btnMove, &QPushButton::clicked,this, &MainWindow::mapMovement);
+    connect(menu->btnQuit, &QPushButton::clicked,this, &MainWindow::close);
 
     map->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
     installEventFilter(this);
     QVBoxLayout* lay=new QVBoxLayout(this);
+
     lay->setMargin(0);
     lay->addWidget(menu);
     lay->addWidget(map);

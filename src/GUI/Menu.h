@@ -11,6 +11,7 @@
 #include <QPainter>
 
 class Menu : public QWidget {
+    Q_OBJECT
 public:
     Menu(QWidget* parent=0);
     void paintEvent(QPaintEvent *event) override;

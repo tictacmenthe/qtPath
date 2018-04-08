@@ -18,7 +18,7 @@
     x \
     qDebug() << __FUNCTION__ << ":" << __LINE__ << " Elapsed time: " <<  CONCAT(sb_, __LINE__).nsecsElapsed() << " ns.";
 
-MapFrame::MapFrame(QWidget *parent, int p_nbCircles) : graph(p_nbCircles, width(),height(), rect()){
+MapFrame::MapFrame(QWidget *parent, int p_nbCircles) : graph(p_nbCircles, width(), height(), rect()){
     //Loading the background image if needed
     background.load("../map.png");
 
@@ -28,34 +28,24 @@ MapFrame::MapFrame(QWidget *parent, int p_nbCircles) : graph(p_nbCircles, width(
     installEventFilter(this);
 
     //Starts update timer for animations
-    //connect(&timer, &QTimer::timeout,this,&MapFrame::updatePos);
+    connect(&timer, &QTimer::timeout,this,&MapFrame::updatePos);
 
     //Used to check whether a map was generated or not(for resize)
     started=false;
 }
 
 void MapFrame::mouseReleaseEvent(QMouseEvent *event) {
-//    if (event->button()==Qt::MouseButton::LeftButton) {
-//        std::shared_ptr<Node> node=std::make_shared<Node>(Node(mousex,mousey));
-//        auto it=std::find_if(edges.begin(),edges.end(),[&](const std::shared_ptr<Edge>& e){return (e->getB()==*startNode && e->getA()==*endNode)||(e->getA()==*startNode && e->getB()==*endNode);});
-//        if(it!=edges.end()){
-//            edges.erase(it);
-//        }
-//        addNode(node, true, false);
-//        if(*endNode!=Node())
-//            addEdge(startNode,endNode);
-//        findPathDijkstra();
-//    } else if(event->button()==Qt::MouseButton::RightButton) {
-//        std::shared_ptr<Node> node=std::make_shared<Node>(Node(mousex,mousey));
-//        auto it=std::find_if(edges.begin(),edges.end(),[&](const std::shared_ptr<Edge>& e){return (e->getB()==*startNode && e->getA()==*endNode)||(e->getA()==*startNode && e->getB()==*endNode);});
-//        if(it!=edges.end()){
-//            edges.erase(it);
-//        }
-//        addNode(node, false, true);
-//        if(*startNode!=Node())
-//            addEdge(startNode,endNode);
-//        findPathDijkstra();
-//    }
+    graph.removeEdgeStartEndNodes();
+
+    std::shared_ptr<Node> node=std::make_shared<Node>(Node(mousex,mousey));
+
+    if(event->button()==Qt::MouseButton::LeftButton){
+        graph.addPathNode(node, START_NODE);
+    }
+    else if(event->button()==Qt::MouseButton::RightButton){
+        graph.addPathNode(node, END_NODE);
+    }
+
     update();
 }
 
@@ -67,7 +57,9 @@ void MapFrame::mouseMoveEvent(QMouseEvent *event) {
 }
 
 void MapFrame::resizeEvent(QResizeEvent *event) {
-    //TODO resize proportionnal with event->size() and event->oldsize()
+    float hratio=float(event->size().height())/event->oldSize().height();
+    float wratio=float(event->size().width())/event->oldSize().width();
+    graph.resize(hratio, wratio, rect());
 }
 
 void MapFrame::mapMovement(){
@@ -87,12 +79,12 @@ void MapFrame::updatePos(){
 
 void MapFrame::paintEvent(QPaintEvent *event) {
     QPainter painter(this);
-    //painter.setRenderHint(QPainter::Antialiasing);
-    painter.setPen(QPen(Qt::gray, 2, Qt::SolidLine, Qt::RoundCap));
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setPen(QPen(Qt::darkGray, 2, Qt::SolidLine, Qt::RoundCap));
     //Background Color
     //painter.fillRect(rect(),Qt::darkGray);
     painter.drawRect(rect());
-    painter.fillRect(rect(),QColor(0x59,0x59,0x59));
+    //painter.fillRect(rect(),QColor(0x59,0x59,0x59));
     //painter.drawPixmap(0,0,width(), height(), background);
 
     graph.paint(painter);

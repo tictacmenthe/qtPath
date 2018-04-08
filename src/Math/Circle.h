@@ -20,10 +20,10 @@ public:
 
     //Getters
     const Vec& getCenter()const{return center;}
-    const int getRadius()const{return radius;}
+    const float getRadius()const{return radius;}
     //Setters
-    void setCenter(const Vec& p_pos){center=p_pos;}
-    void setRadius(int r){radius=r;}
+    void setCenter(const Vec& p_pos){center.setX(p_pos.x());center.setY(p_pos.y());}
+    void setRadius(float r){radius=r;}
 
     bool operator==(const Circle& c2)const;
 private:

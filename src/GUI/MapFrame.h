@@ -20,24 +20,25 @@
 
 
 class MapFrame : public QFrame {
-public:
-    MapFrame(QWidget* parent, int p_nbCircles);
-    void paintEvent(QPaintEvent* event);
+    Q_OBJECT
 
-private:
     Graph graph;
     QTimer timer;
     QPixmap background;
 
     void findPathDijkstra();
 
-
     int mousex=0;
     int mousey=0;
-    bool started;
 
-public:
+    bool started;
+    void resizeEvent(QResizeEvent *event);
+    void mouseMoveEvent(QMouseEvent *event);
+    void mouseReleaseEvent(QMouseEvent *event);
+
+public slots:
     void mapMovement();
+    void updatePos();
 
     void start(){
         started=true;
@@ -50,11 +51,10 @@ public:
         update();
     }
 
-private:
-    void updatePos();
-    void resizeEvent(QResizeEvent *event);
-    void mouseMoveEvent(QMouseEvent *event);
-    void mouseReleaseEvent(QMouseEvent *event);
+public:
+    MapFrame(QWidget* parent, int p_nbCircles);
+    void paintEvent(QPaintEvent* event);
+
 };
 
 

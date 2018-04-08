@@ -13,6 +13,12 @@
 #include <QDebug>
 
 
+enum NodeType{
+    DEFAULT,
+    START_NODE,
+    END_NODE
+};
+
 class Graph {
 
     enum ObstacleState{
@@ -21,6 +27,7 @@ class Graph {
         IN_OBSTACLE
     };
 
+    static constexpr int DijkstraMaxDistance=100000000;
 
     int nbCircles;
     int width;
@@ -39,13 +46,12 @@ class Graph {
     std::vector<std::shared_ptr<Node>> pathNodes;
     std::vector<std::shared_ptr<Edge>> pathEdges;
 
-    int checkObstacleInEdge(const Circle &c, const Edge &e, bool verifyDistance=false);
+    ObstacleState checkObstacleInEdge(const Circle &c, const Edge &e);
 
     void addCircle(const Vec &center, int radius);
-    void addNode(std::shared_ptr<Node> &position, bool isStart=false, bool isEnd=false);
-    void addEdge(std::shared_ptr<Node> &a,std::shared_ptr<Node> &b, bool isStart = false, bool isEnd = false);
+    void addNode(std::shared_ptr<Node> &position);
+    void addEdge(std::shared_ptr<Node> &a, std::shared_ptr<Node> &b, NodeType type=DEFAULT);
     void removeEdgesOfNode(Node &n);
-
     void populateObstacles();
     void populateNodes();
     void populateEdges();
@@ -55,13 +61,20 @@ class Graph {
     void findPathDijkstra();
 
 public:
+
     Graph(int p_nbCircles, int width, int height, QRect parentRect);
     void paint(QPainter& painter);
 
     void populate();
     void clear();
+    void resize(float hratio, float wratio, const QRect newRect);
+
+    void addPathNode(std::shared_ptr<Node> &position, NodeType type);
+    void removeEdgeStartEndNodes();
+    bool checkNodeCreation(std::shared_ptr<Node> &position);
 
     void update();
+
 };
 
 

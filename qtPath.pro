@@ -42,3 +42,4 @@ SOURCES += src/main.cpp \
            src/Math/Vec.cpp \
            cmake-build-debug/CMakeFiles/3.9.6/CompilerIdC/CMakeCCompilerId.c \
            cmake-build-debug/CMakeFiles/3.9.6/CompilerIdCXX/CMakeCXXCompilerId.cpp
+RESOURCSE = stylesheet/breeze.qrc
