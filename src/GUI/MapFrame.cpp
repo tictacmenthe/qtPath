@@ -6,17 +6,10 @@
 #include "MapFrame.h"
 
 
-#define TIMER_FREQ   24
+#define TIMER_FREQ   60
 #define TIMER_PERIOD (int)1000/TIMER_FREQ
 
-#define CONCAT_(x,y) x##y
-#define CONCAT(x,y) CONCAT_(x,y)
 
-#define CHECKTIME(x)  \
-    QElapsedTimer CONCAT(sb_, __LINE__); \
-    CONCAT(sb_, __LINE__).start(); \
-    x \
-    qDebug() << __FUNCTION__ << ":" << __LINE__ << " Elapsed time: " <<  CONCAT(sb_, __LINE__).nsecsElapsed() << " ns.";
 
 MapFrame::MapFrame(QWidget *parent, int p_nbCircles) : graph(p_nbCircles, width(), height(), rect()){
     //Loading the background image if needed
@@ -31,7 +24,8 @@ MapFrame::MapFrame(QWidget *parent, int p_nbCircles) : graph(p_nbCircles, width(
     connect(&timer, &QTimer::timeout,this,&MapFrame::updatePos);
 
     //Used to check whether a map was generated or not(for resize)
-    started=false;
+    generated=false;
+    elapsedTimer.start();
 }
 
 void MapFrame::mouseReleaseEvent(QMouseEvent *event) {
@@ -62,7 +56,7 @@ void MapFrame::resizeEvent(QResizeEvent *event) {
     graph.resize(hratio, wratio, rect());
 }
 
-void MapFrame::mapMovement(){
+void MapFrame::startMovement(){
     if(timer.isActive()) {
         timer.stop();
     }
@@ -78,6 +72,8 @@ void MapFrame::updatePos(){
 
 
 void MapFrame::paintEvent(QPaintEvent *event) {
+    static qint64 t=elapsedTimer.nsecsElapsed();
+    qDebug()<<(elapsedTimer.nsecsElapsed()-t)/1000000;
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setPen(QPen(Qt::darkGray, 2, Qt::SolidLine, Qt::RoundCap));
@@ -91,17 +87,5 @@ void MapFrame::paintEvent(QPaintEvent *event) {
 
     painter.drawText(20,20,QString("x: ").append(QString::number(mousex)));
     painter.drawText(20,40,QString("y: ").append(QString::number(mousey)));
-}
-
-
-/*********************************************************/
-/*                      PATHFINDING                      */
-/*********************************************************/
-
-
-
-void MapFrame::findPathDijkstra(){
-    qDebug()<<"===================================================================";
-
-    update();
+    t=elapsedTimer.nsecsElapsed();
 }

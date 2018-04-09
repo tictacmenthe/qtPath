@@ -7,7 +7,7 @@
 
 MainWindow::MainWindow(QWidget *parent) : menu(new Menu(this)), map(new MapFrame(this,25)) {
     connect(menu->btnReset, &QPushButton::clicked,map, &MapFrame::reset);
-    connect(menu->btnStart, &QPushButton::clicked,map, &MapFrame::start);
+    connect(menu->btnStart, &QPushButton::clicked,map, &MapFrame::generate);
     connect(menu->btnMove, &QPushButton::clicked,this, &MainWindow::mapMovement);
     connect(menu->btnQuit, &QPushButton::clicked,this, &MainWindow::close);
 
@@ -20,11 +20,12 @@ MainWindow::MainWindow(QWidget *parent) : menu(new Menu(this)), map(new MapFrame
     lay->addWidget(menu);
     lay->addWidget(map);
     setLayout(lay);
+
 }
 
 void MainWindow::mapMovement(){
     menu->btnMove->setText(menu->btnMove->text().compare("Lancer")?"Lancer":"Pause");
-    map->mapMovement();
+    map->startMovement();
     menu->update();
 }
 
@@ -39,7 +40,7 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event) {
             static bool active=false;
             std::cout<<"Space pressed, generating"<<std::endl;
             if(!active){
-                map->start();
+                map->generate();
                 active=true;
             }
             else{

@@ -4,7 +4,7 @@
 
 #include "Circle.h"
 #include <math.h>
-Circle::Circle(Vec pos, int r) :center(pos), radius(r), Movable(0.5+100.0f/r){}
+Circle::Circle(Vec pos, int r) :center(pos), radius(r), Movable(5+100.0f/r){}
 
 void Circle::draw(QPainter & painter)const {
     painter.drawEllipse(center,radius,radius);
@@ -18,5 +18,3 @@ bool Circle::contains(const Vec &vec) const {
 bool Circle::operator==(const Circle &c2) const {
     return center==c2.getCenter();
 }
-
-

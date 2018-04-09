@@ -5,6 +5,16 @@
 #include <QtCore/QElapsedTimer>
 #include "Graph.h"
 
+
+#define CONCAT_(x,y) x##y
+#define CONCAT(x,y) CONCAT_(x,y)
+#define CHECKTIME(x)  \
+    QElapsedTimer CONCAT(sb_, __LINE__); \
+    CONCAT(sb_, __LINE__).start(); \
+    x \
+    qDebug() << __FUNCTION__ << ":" << __LINE__ << " Elapsed time: " <<  CONCAT(sb_, __LINE__).nsecsElapsed()/1000 << " µs.";
+
+
 Graph::Graph(int p_nbCircles, int p_width, int p_height, QRect parentRect):parent(parentRect) {
     nbCircles=p_nbCircles;
     width=p_width;
@@ -282,12 +292,14 @@ void Graph::removeEdgesOfNode(Node &n){
  * Removes the edge linking start and end nodes together
  */
 void Graph::removeEdgeStartEndNodes() {
-    auto it=std::find_if(edges.begin(),edges.end(),[&](const std::shared_ptr<Edge>& e)
-    {
-        return (e->getB()==*startNode && e->getA()==*endNode)||(e->getA()==*startNode && e->getB()==*endNode);
-    });
-    if(it!=edges.end())
-        edges.erase(it);
+    if(*startNode!=Node() && *endNode!=Node()) {
+        auto it = std::find_if(edges.begin(), edges.end(), [&](const std::shared_ptr<Edge> &e) {
+            return (e->getB() == *startNode && e->getA() == *endNode) ||
+                   (e->getA() == *startNode && e->getB() == *endNode);
+        });
+        if (it != edges.end())
+            edges.erase(it);
+    }
 }
 
 /* **************************************************
@@ -318,11 +330,13 @@ void Graph::paint(QPainter &painter) {
     painter.setPen(QPen(Qt::red,5));
 
     endNode->draw(painter);
+    //    CHECKTIME(
+    //    painter.setPen(QPen(Qt::yellow,0.1));
+    //    for(auto& e:edges){
+    //        e->draw(painter);
+    //    }
+    //    )
 
-    painter.setPen(QPen(Qt::yellow,0.1));
-    for(auto& e:edges){
-        e->draw(painter);
-    }
     painter.setPen(QPen(Qt::green,0.2));
     for(auto& e:startEdges){
         e->draw(painter);
@@ -338,6 +352,7 @@ void Graph::paint(QPainter &painter) {
     for(auto& e:pathEdges){
         e->draw(painter);
     }
+
     painter.setFont(QFont("Arial",10));
     painter.setPen(QPen(Qt::red,1));
 
@@ -453,7 +468,7 @@ std::shared_ptr<Node> Graph::minDistNode(std::vector<std::shared_ptr<Node>> &tre
  * Tries to find a path between two nodes set by left and right click, according to the Dijkstra algorithm
  */
 void Graph::findPathDijkstra(){
-    qDebug()<<"Searching path from"<<*startNode<<" to "<<*endNode<<" with Dijkstra";
+    //qDebug()<<"Searching path from"<<*startNode<<" to "<<*endNode<<" with Dijkstra";
 
     pathEdges.clear();
     pathNodes.clear();
@@ -482,24 +497,24 @@ void Graph::findPathDijkstra(){
     }
 
     qint64 end=timer.nsecsElapsed();
-    qDebug()<<"Took "<<end/1000<<" µs";
+    //qDebug()<<"Took "<<end/1000<<" µs";
     if(endNode->getDistance()==DijkstraMaxDistance){
-        qDebug()<<"No Path found";
+    //    qDebug()<<"No Path found";
         return;
     }
 
-    auto deb=qDebug();
-    deb<<"Path: ";
+    //auto deb=qDebug();
+    //deb<<"Path: ";
     std::shared_ptr<Node> currentNode=endNode;
     while(*currentNode!=*startNode){
-        deb<<*currentNode;
+    //    deb<<*currentNode;
         pathNodes.push_back(currentNode);
         currentNode = currentNode->getPredecessor();
     }
     pathNodes.push_back(currentNode);
-    qDebug()<<"Path length:"<<endNode->getDistance()<<" with "<<pathNodes.size()-2<<" nodes";
+    //qDebug()<<"Path length:"<<endNode->getDistance()<<" with "<<pathNodes.size()-2<<" nodes";
 
-    deb<<*startNode;
+    //deb<<*startNode;
     for(int i=0;i<pathNodes.size()-1;i++){
         pathEdges.push_back(std::make_shared<Edge>(Edge(pathNodes.at(i),pathNodes.at(i+1))));
     }
@@ -574,11 +589,25 @@ void Graph::update() {
 //        }
 //    }
 
+    //TODO: updates are getting longer and longer
+
     nodes.clear();
     edges.clear();
+    startEdges.clear();
+    endEdges.clear();
+    pathNodes.clear();
+    pathEdges.clear();
 
 
     populateNodes();
     populateEdges();
+
+    removeEdgeStartEndNodes();
+    removeEdgesOfNode(*startNode);
+    removeEdgesOfNode(*endNode);
+
+    addPathNode(startNode,START_NODE);
+    addPathNode(endNode,END_NODE);
+    findPathDijkstra();
 }
 

@@ -25,28 +25,27 @@ class MapFrame : public QFrame {
     Graph graph;
     QTimer timer;
     QPixmap background;
-
-    void findPathDijkstra();
+    QElapsedTimer elapsedTimer;
 
     int mousex=0;
     int mousey=0;
 
-    bool started;
+    bool generated;
     void resizeEvent(QResizeEvent *event);
     void mouseMoveEvent(QMouseEvent *event);
     void mouseReleaseEvent(QMouseEvent *event);
 
 public slots:
-    void mapMovement();
+    void startMovement();
     void updatePos();
 
-    void start(){
-        started=true;
+    void generate(){
+        generated=true;
         graph.populate();
         update();
     }
     void reset(){
-        started=false;
+        generated=false;
         graph.clear();
         update();
     }
