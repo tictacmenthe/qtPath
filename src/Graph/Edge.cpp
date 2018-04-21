@@ -6,7 +6,7 @@
 
 Edge::Edge(std::shared_ptr<Node> a, std::shared_ptr<Node> b) : nodeA(a),nodeB(b){
     center=(*a+*b)/2;
-    length=b->dist(*a);
+    length= b->distanceTo(*a);
     direction=(*b)-(*a);
 }
 

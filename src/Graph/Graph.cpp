@@ -3,6 +3,7 @@
 //
 
 #include <QtCore/QElapsedTimer>
+#include <queue>
 #include "Graph.h"
 
 
@@ -19,8 +20,8 @@ Graph::Graph(int p_nbCircles, int p_width, int p_height, QRect parentRect):paren
     nbCircles=p_nbCircles;
     width=p_width;
     height=p_height;
-    startNode=std::make_shared<Node>();
-    endNode=std::make_shared<Node>();
+    startNode=std::make_shared<Node>(0,0);
+    endNode=std::make_shared<Node>(0,0);
 }
 
 
@@ -35,10 +36,10 @@ void Graph::populate() {
     clear();
 
     //shortcut nodes, linking all edges of the map if possible
-    nodes.push_back(std::shared_ptr<Node>(new Node(1,1)));
-    nodes.push_back(std::shared_ptr<Node>(new Node(1,height-1)));
-    nodes.push_back(std::shared_ptr<Node>(new Node(width-1,1)));
-    nodes.push_back(std::shared_ptr<Node>(new Node(width-1,height-1)));
+    nodes.push_back(std::shared_ptr<Node>(new Node(5,5)));
+    nodes.push_back(std::shared_ptr<Node>(new Node(5,height-5)));
+    nodes.push_back(std::shared_ptr<Node>(new Node(width-5,5)));
+    nodes.push_back(std::shared_ptr<Node>(new Node(width-5,height-5)));
 
     populateObstacles();
     populateNodes();
@@ -179,24 +180,25 @@ void Graph::addPathNode(std::shared_ptr<Node> &position, NodeType type) {
             removeEdgesOfNode(*startNode);
             startNode = position;
             startEdges.clear();
-            for (auto &n:nodes) {
-                addEdge(startNode, n, START_NODE);
-            }
-            if (*endNode != Node()) {
-                addEdge(startNode, endNode);
-                findPathDijkstra();
-
+            if(*startNode != Node()) {
+                for (auto &n:nodes) {
+                    addEdge(startNode, n, START_NODE);
+                }
+                if (*endNode != Node()) {
+                    addEdge(startNode, endNode);
+                }
             }
         } else if (type == END_NODE) {
             removeEdgesOfNode(*endNode);
             endEdges.clear();
             endNode = position;
-            for (auto &n:nodes) {
-                addEdge(endNode, n, END_NODE);
-            }
-            if (*startNode != Node()) {
-                addEdge(startNode, endNode);
-                findPathDijkstra();
+            if(*endNode != Node()) {
+                for (auto &n:nodes) {
+                    addEdge(endNode, n, END_NODE);
+                }
+                if (*startNode != Node()) {
+                    addEdge(startNode, endNode);
+                }
             }
         }
     }
@@ -286,6 +288,7 @@ void Graph::removeEdgesOfNode(Node &n){
             endEdges.erase(toRemove);
         }
     }
+    n.clearEdges();
 }
 
 /**
@@ -330,12 +333,11 @@ void Graph::paint(QPainter &painter) {
     painter.setPen(QPen(Qt::red,5));
 
     endNode->draw(painter);
-    //    CHECKTIME(
-    //    painter.setPen(QPen(Qt::yellow,0.1));
-    //    for(auto& e:edges){
-    //        e->draw(painter);
-    //    }
-    //    )
+        painter.setPen(QPen(Qt::yellow,0.1));
+//        for(auto& e:edges){
+//            e->draw(painter);
+//        }
+
 
     painter.setPen(QPen(Qt::green,0.2));
     for(auto& e:startEdges){
@@ -358,7 +360,7 @@ void Graph::paint(QPainter &painter) {
 
     painter.drawText(width-100,height-50,QString("C: ").append(QString::number(obstacles.size())));
     painter.drawText(width-100,height-30,QString("N: ").append(QString::number(nodes.size()+(*startNode!=Node())+(*endNode!=(Node())))));
-    painter.drawText(width-100,height-10,QString("E: ").append(QString::number((edges.size()+startEdges.size()+endEdges.size()))));
+    painter.drawText(width-100,height-10,QString("E: ").append(QString::number((edges.size()+startNode->getEdges().size()+endNode->getEdges().size()))));
 }
 
 void Graph::resize(float hratio, float wratio, const QRect newRect){
@@ -417,16 +419,16 @@ void Graph::resize(float hratio, float wratio, const QRect newRect){
  */
 void Graph::checkNeighbours(std::shared_ptr<Node> &currentNode) {
     for(auto& e:currentNode->getEdges()){
-        int d=currentNode->getDistance()+e->getLength();
+        int d= currentNode->getCost()+e->getLength();
         if(e->getA()==*currentNode){
-            if(!e->getB().isVisited() && d<e->getB().getDistance()){
-                e->getB().setDistance(d);
+            if(!e->getB().isVisited() && d< e->getB().getCost()){
+                e->getB().setCost(d);
                 e->getB().setPredecessor(currentNode);
             }
         }
         else{
-            if(!e->getB().isVisited() && d<e->getA().getDistance()){
-                e->getA().setDistance(d);
+            if(!e->getB().isVisited() && d< e->getA().getCost()){
+                e->getA().setCost(d);
                 e->getA().setPredecessor(currentNode);
             }
         }
@@ -443,7 +445,7 @@ std::shared_ptr<Node> Graph::minDistNode(std::vector<std::shared_ptr<Node>> &tre
         std::vector<std::shared_ptr<Node>>::iterator node=std::min_element(tree.begin(),tree.end(),
            [](const std::shared_ptr<Node>& a,const std::shared_ptr<Node>& b)
            {
-               return a->getDistance()<b->getDistance();
+               return a->getCost()< b->getCost();
            });
 
         while((*node)->isVisited()){
@@ -453,7 +455,7 @@ std::shared_ptr<Node> Graph::minDistNode(std::vector<std::shared_ptr<Node>> &tre
             node=std::min_element(tree.begin(),tree.end(),
                                   [](const std::shared_ptr<Node>& a,const std::shared_ptr<Node>& b)
                                   {
-                                      return a->getDistance()<b->getDistance();
+                                      return a->getCost()< b->getCost();
                                   }
             );
         }
@@ -467,8 +469,13 @@ std::shared_ptr<Node> Graph::minDistNode(std::vector<std::shared_ptr<Node>> &tre
 /**
  * Tries to find a path between two nodes set by left and right click, according to the Dijkstra algorithm
  */
+
+void Graph::findPath(){
+//    findPathDijkstra();
+    findPathAstar();
+}
 void Graph::findPathDijkstra(){
-    //qDebug()<<"Searching path from"<<*startNode<<" to "<<*endNode<<" with Dijkstra";
+    qDebug()<<"Searching path from"<<*startNode<<" to "<<*endNode<<" with Dijkstra";
 
     pathEdges.clear();
     pathNodes.clear();
@@ -481,11 +488,11 @@ void Graph::findPathDijkstra(){
     timer.start();
 
     for(auto& n:unvisited){
-        n->setDistance(DijkstraMaxDistance);
+        n->setCost(DijkstraMaxDistance);
         n->setNotVisited();
     }
 
-    startNode->setDistance(0);
+    startNode->setCost(0);
 
     while(!unvisited.empty()){
         std::shared_ptr<Node> currentNode=minDistNode(unvisited);
@@ -498,7 +505,7 @@ void Graph::findPathDijkstra(){
 
     qint64 end=timer.nsecsElapsed();
     //qDebug()<<"Took "<<end/1000<<" µs";
-    if(endNode->getDistance()==DijkstraMaxDistance){
+    if(endNode->getCost()==DijkstraMaxDistance){
     //    qDebug()<<"No Path found";
         return;
     }
@@ -512,7 +519,7 @@ void Graph::findPathDijkstra(){
         currentNode = currentNode->getPredecessor();
     }
     pathNodes.push_back(currentNode);
-    //qDebug()<<"Path length:"<<endNode->getDistance()<<" with "<<pathNodes.size()-2<<" nodes";
+    //qDebug()<<"Path length:"<<endNode->getCost()<<" with "<<pathNodes.size()-2<<" nodes";
 
     //deb<<*startNode;
     for(int i=0;i<pathNodes.size()-1;i++){
@@ -522,92 +529,121 @@ void Graph::findPathDijkstra(){
 }
 
 
+void Graph::findPathAstar(){
+    qDebug()<<"Searching path from"<<*startNode<<" to "<<*endNode<<" with A*";
+
+    pathEdges.clear();
+    pathNodes.clear();
+
+    std::deque<std::shared_ptr<Node>> closedList;
+
+    auto comparator=[](std::shared_ptr<Node> a, std::shared_ptr<Node> b){
+        if(a->getHeuristic()< b->getHeuristic()){
+            return 1;
+        }
+        else if(a->getHeuristic() > b->getHeuristic()){
+            return -1;
+        }
+        else{
+            return 0;
+        }
+    };
+
+    std::priority_queue<std::shared_ptr<Node>, std::deque<std::shared_ptr<Node>>, decltype(comparator)> openList(comparator);
+
+    startNode->setCost(0);
+    startNode->setHeuristic(0);
+    openList.push(startNode);
+
+    QElapsedTimer timer;
+    timer.start();
+
+    while(!openList.empty()){
+        auto currentNode=openList.top();
+        openList.pop();
+        if(*currentNode==*endNode){
+            endNode->setPredecessor(currentNode);
+            break;
+        }
+        for(auto& e:currentNode->getEdges()){
+            int d= currentNode->getCost()+e->getLength();
+            if(e->getA()==*currentNode){
+                if(std::find_if(closedList.begin(),closedList.end(),[](std::shared_ptr<Node> node){e->getB()==*node;})!=closedList.end()){
+
+                }
+            }
+            else{
+
+            }
+        }
+
+    }
+
+    qint64 end=timer.nsecsElapsed();
+    //qDebug()<<"Took "<<end/1000<<" µs";
+    if(endNode->getCost()==DijkstraMaxDistance){
+        //    qDebug()<<"No Path found";
+        return;
+    }
+
+    //auto deb=qDebug();
+    //deb<<"Path: ";
+    std::shared_ptr<Node> currentNode=endNode;
+    while(*currentNode!=*startNode){
+        //    deb<<*currentNode;
+        pathNodes.push_back(currentNode);
+        currentNode = currentNode->getPredecessor();
+    }
+    pathNodes.push_back(currentNode);
+    //qDebug()<<"Path length:"<<endNode->getCost()<<" with "<<pathNodes.size()-2<<" nodes";
+
+    //deb<<*startNode;
+    for(int i=0;i<pathNodes.size()-1;i++){
+        pathEdges.push_back(std::make_shared<Edge>(Edge(pathNodes.at(i),pathNodes.at(i+1))));
+    }
+}
+
 /****************************************************
  *                      Animation                   *
  ****************************************************/
 
 void Graph::update() {
     std::default_random_engine generator(time(nullptr));
-    std::normal_distribution<float> distribution(0,0.2);
-
+    std::normal_distribution<float> distribution(0,0.1);
+    static QElapsedTimer updateTimer;
+    if(!updateTimer.isValid())
+        updateTimer.start();
+    static qint64 lastT=0;
+    float deltaT=(updateTimer.nsecsElapsed()-lastT)/100000000.0;
+    lastT=updateTimer.nsecsElapsed();
     for(Circle& c: obstacles){
         float addvx=distribution(generator);
         float addvy=distribution(generator);
         c.addSpeeds(addvx,addvy);
-        c.setCenter(c.getCenter()+Vec(c.getSpeedX(),c.getSpeedY()));
+        c.setCenter(c.getCenter()+Vec(c.getSpeedX()*deltaT,c.getSpeedY()*deltaT));
         if(!parent.contains(c.getCenter())){
             obstacles.erase(std::find(obstacles.begin(),obstacles.end(),c));
         }
     }
 
-//    for(auto itn=nodes.begin(); itn!=nodes.end();){
-//        auto& n=**itn;
-//        bool toErase=false;
-//        float addvx=distribution(generator);
-//        float addvy=distribution(generator);
-//        n.addSpeeds(addvx,addvy);
-//
-//        n.setX(n.x()+n.getSpeedX());
-//        n.setY(n.y()+n.getSpeedY());
-//
-//        for(auto& c:obstacles){
-//            if(c.contains(n)){
-//                toErase=true;
-//                break;
-//            }
-//        }
-//        if(!parent.contains(n) || toErase){
-//            removeEdgesOfNode(n);
-//            itn=nodes.erase(itn);
-//        }
-//        else{
-//            itn++;
-//        }
-//    }
-//
-//    //Deletion of edges that intersect with circles
-//    for(auto ite=edges.begin();ite!=edges.end();){
-//        auto& e=**ite;
-//        ObstacleState state=NOT_IN_OBSTACLE;
-//        for(const auto& c:obstacles){
-//            state=checkObstacleInEdge(c,e);
-//            if(state==IGNORE){
-//                state=NOT_IN_OBSTACLE;
-//                continue;
-//            }
-//            else if(state==IN_OBSTACLE){
-//                break;
-//            }
-//        }
-//        if(state==IN_OBSTACLE){
-//            e.getA().removeEdge(*ite);
-//            e.getB().removeEdge(*ite);
-//            ite=edges.erase(ite);
-//        }
-//        else{
-//            ite++;
-//        }
-//    }
-
-    //TODO: updates are getting longer and longer
-
-    nodes.clear();
     edges.clear();
+    nodes.clear();
     startEdges.clear();
     endEdges.clear();
     pathNodes.clear();
     pathEdges.clear();
-
-
+    nodes.push_back(std::shared_ptr<Node>(new Node(5,5)));
+    nodes.push_back(std::shared_ptr<Node>(new Node(5,height-5)));
+    nodes.push_back(std::shared_ptr<Node>(new Node(width-5,5)));
+    nodes.push_back(std::shared_ptr<Node>(new Node(width-5,height-5)));
     populateNodes();
     populateEdges();
 
     removeEdgeStartEndNodes();
-    removeEdgesOfNode(*startNode);
-    removeEdgesOfNode(*endNode);
 
     addPathNode(startNode,START_NODE);
     addPathNode(endNode,END_NODE);
-    findPathDijkstra();
+
+    findPath();
 }
 

@@ -6,7 +6,7 @@
 #include "MapFrame.h"
 
 
-#define TIMER_FREQ   60
+#define TIMER_FREQ   30
 #define TIMER_PERIOD (int)1000/TIMER_FREQ
 
 
@@ -40,6 +40,8 @@ void MapFrame::mouseReleaseEvent(QMouseEvent *event) {
         graph.addPathNode(node, END_NODE);
     }
 
+    graph.findPath();
+
     update();
 }
 
@@ -72,8 +74,7 @@ void MapFrame::updatePos(){
 
 
 void MapFrame::paintEvent(QPaintEvent *event) {
-    static qint64 t=elapsedTimer.nsecsElapsed();
-    qDebug()<<(elapsedTimer.nsecsElapsed()-t)/1000000;
+
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setPen(QPen(Qt::darkGray, 2, Qt::SolidLine, Qt::RoundCap));
@@ -87,5 +88,4 @@ void MapFrame::paintEvent(QPaintEvent *event) {
 
     painter.drawText(20,20,QString("x: ").append(QString::number(mousex)));
     painter.drawText(20,40,QString("y: ").append(QString::number(mousey)));
-    t=elapsedTimer.nsecsElapsed();
 }
